@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  aiseg2mqtt:
+    build: .
+    # または Docker Hub からイメージを使用
+    # image: yourusername/aiseg2mqtt:latest
+    container_name: aiseg2mqtt
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # 環境変数で上書き可能
+      - INTERVAL_SECONDS=300
+      - LOG_LEVEL=INFO
+    networks:
+      - iot
+
+networks:
+  iot:
+    external: true
+    # または以下でネットワークを作成
+    # driver: bridge

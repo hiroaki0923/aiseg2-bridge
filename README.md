@@ -91,6 +91,35 @@ Home AssistantのMQTT Discoveryで作成されたセンサーを削除：
 uv run aiseg2_clean.py
 ```
 
+## Docker での使用
+
+### イメージのビルド
+
+```bash
+docker build -t aiseg2mqtt .
+```
+
+### 実行
+
+```bash
+# .envファイルを使用して実行
+docker run --rm --env-file .env aiseg2mqtt
+
+# docker-composeを使用
+cp docker-compose.yaml.example docker-compose.yaml
+docker-compose up -d
+```
+
+### 単発実行
+
+```bash
+# データを1回だけ取得
+docker run --rm --env-file .env aiseg2mqtt uv run aiseg2_publish.py
+
+# Discovery設定をクリーンアップ
+docker run --rm --env-file .env aiseg2mqtt uv run aiseg2_clean.py
+```
+
 ## Home Assistant での表示
 
 MQTT Discoveryにより、以下のセンサーが自動的に作成されます：
