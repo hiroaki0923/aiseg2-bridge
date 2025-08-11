@@ -1,7 +1,7 @@
 [project]
 name = "aiseg2mqtt"
 version = "0.1.0"
-description = "Add your description here"
+description = "AISEG2 to MQTT bridge for Home Assistant integration"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
