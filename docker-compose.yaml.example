@@ -2,9 +2,9 @@ version: '3.8'
 
 services:
   aiseg2mqtt:
-    build: .
-    # または Docker Hub からイメージを使用
-    # image: yourusername/aiseg2mqtt:latest
+    image: hiroaki0923/aiseg2mqtt:latest
+    # またはローカルでビルドする場合
+    # build: .
     container_name: aiseg2mqtt
     restart: unless-stopped
     env_file:

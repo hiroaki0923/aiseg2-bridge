@@ -93,31 +93,35 @@ uv run aiseg2_clean.py
 
 ## Docker での使用
 
-### イメージのビルド
+### Docker Hub からイメージを使用（推奨）
 
 ```bash
-docker build -t aiseg2mqtt .
-```
+# 最新版を使用
+docker pull hiroaki0923/aiseg2mqtt:latest
 
-### 実行
-
-```bash
 # .envファイルを使用して実行
-docker run --rm --env-file .env aiseg2mqtt
+docker run --rm --env-file .env hiroaki0923/aiseg2mqtt:latest
 
 # docker-composeを使用
 cp docker-compose.yaml.example docker-compose.yaml
 docker-compose up -d
 ```
 
+### ローカルでイメージをビルド
+
+```bash
+docker build -t aiseg2mqtt .
+docker run --rm --env-file .env aiseg2mqtt
+```
+
 ### 単発実行
 
 ```bash
 # データを1回だけ取得
-docker run --rm --env-file .env aiseg2mqtt uv run aiseg2_publish.py
+docker run --rm --env-file .env hiroaki0923/aiseg2mqtt:latest uv run aiseg2_publish.py
 
 # Discovery設定をクリーンアップ
-docker run --rm --env-file .env aiseg2mqtt uv run aiseg2_clean.py
+docker run --rm --env-file .env hiroaki0923/aiseg2mqtt:latest uv run aiseg2_clean.py
 ```
 
 ## Home Assistant での表示
