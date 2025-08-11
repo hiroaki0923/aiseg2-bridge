@@ -113,7 +113,7 @@ def fetch_circuit_kwh(circuit_id: str) -> float:
 
 # ----- MQTT -----
 def mqtt_client() -> mqtt.Client:
-    mc = mqtt.Client(protocol=mqtt.MQTTv311)
+    mc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="", protocol=mqtt.MQTTv311)
     if MQTT_USER:
         mc.username_pw_set(MQTT_USER, MQTT_PASS)
     mc.max_inflight_messages_set(100)
