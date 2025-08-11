@@ -22,6 +22,7 @@ import base64
 import re
 import datetime as dt
 from typing import Dict, List, Any
+from zoneinfo import ZoneInfo
 
 import requests
 from requests.auth import HTTPDigestAuth
@@ -146,16 +147,23 @@ def publish_discovery_energy(mc: mqtt.Client, uid: str, key: str, name: str, obj
     uniq = f"{uid}_{key}"
     cfg_t = f"{MQTT_PREFIX}/sensor/{uniq}/config"
     st_t  = energy_state_topic(uid, key)
+    # 日本時間の今日の0時を計算
+    jst = ZoneInfo("Asia/Tokyo")
+    now_jst = dt.datetime.now(jst)
+    today_midnight_jst = now_jst.replace(hour=0, minute=0, second=0, microsecond=0)
+    
     payload = {
         "name": name,
         "object_id": f"aiseg2mqtt_{object_id}",   # ← prefix追加
         "uniq_id": uniq,
         "dev": {"ids":[uid], "name": DEVICE_NAME, "mf": MANUFACTURER, "mdl": MODEL, "sw": "web-scrape"},
         "stat_t": st_t, "avty_t": avty_t,
-        "dev_cla": "energy", "stat_cla": "total_increasing",
+        "dev_cla": "energy",
+        "stat_cla": "total",
         "unit_of_meas": "kWh",
         "val_tpl": "{{ value_json.kwh }}",
         "json_attr_t": attr_t,
+        "last_reset": today_midnight_jst.isoformat(),
     }
     publish_and_wait(mc, cfg_t, json.dumps(payload, ensure_ascii=False))
     return st_t
@@ -164,16 +172,23 @@ def publish_discovery_circuit(mc: mqtt.Client, uid: str, cid: str, cname: str, a
     uniq = f"{uid}_c{cid}_kwh"
     cfg_t = f"{MQTT_PREFIX}/sensor/{uniq}/config"
     st_t  = circuit_state_topic(uid, cid)
+    # 日本時間の今日の0時を計算
+    jst = ZoneInfo("Asia/Tokyo")
+    now_jst = dt.datetime.now(jst)
+    today_midnight_jst = now_jst.replace(hour=0, minute=0, second=0, microsecond=0)
+    
     payload = {
         "name": cname,
         "object_id": f"aiseg2mqtt_c{cid}",   # ← prefix追加
         "uniq_id": uniq,
         "dev": {"ids":[uid], "name": DEVICE_NAME, "mf": MANUFACTURER, "mdl": MODEL, "sw": "web-scrape"},
         "stat_t": st_t, "avty_t": avty_t,
-        "dev_cla": "energy", "stat_cla": "total_increasing",
+        "dev_cla": "energy",
+        "stat_cla": "total",
         "unit_of_meas": "kWh",
         "val_tpl": "{{ value_json.kwh }}",
         "json_attr_t": st_t,
+        "last_reset": today_midnight_jst.isoformat(),
     }
     publish_and_wait(mc, cfg_t, json.dumps(payload, ensure_ascii=False))
     return st_t
