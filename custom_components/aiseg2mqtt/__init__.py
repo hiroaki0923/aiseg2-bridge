@@ -31,9 +31,24 @@ def _to_float(s: Optional[str]) -> float:
     """Convert string to float, handling Japanese characters."""
     if not s: 
         return 0.0
-    t = s.replace('，', ',').replace('．', '.').replace(',', '')
-    m = _NUM.search(t)
-    return float(m.group(1)) if m else 0.0
+    try:
+        t = s.replace('，', ',').replace('．', '.').replace(',', '')
+        m = _NUM.search(t)
+        value = float(m.group(1)) if m else 0.0
+        return _validate_energy_value(value, s)
+    except (ValueError, TypeError) as err:
+        _LOGGER.warning("Failed to parse energy value '%s': %s", s, err)
+        return 0.0
+
+def _validate_energy_value(value: float, original_str: str) -> float:
+    """Validate energy values are reasonable."""
+    if value < 0:
+        _LOGGER.warning("Negative energy value detected: %f (from '%s')", value, original_str)
+        return 0.0
+    if value > 999999:  # Suspiciously large value (>999MWh per day)
+        _LOGGER.warning("Suspiciously large energy value: %f (from '%s')", value, original_str)
+        return 0.0
+    return value
 
 
 @dataclass
@@ -64,10 +79,23 @@ class AiSeg2Client:
 
     async def _get_html_texts(self, path: str, xpath: str) -> List[str]:
         """Fetch HTML and extract text using XPath."""
-        r = await self._client.get(path)
-        r.raise_for_status()
-        root = html.fromstring(r.content)
-        return [t for t in root.xpath(xpath) if isinstance(t, str)]
+        try:
+            r = await self._client.get(path)
+            r.raise_for_status()
+            root = html.fromstring(r.content)
+            return [t for t in root.xpath(xpath) if isinstance(t, str)]
+        except httpx.TimeoutException:
+            _LOGGER.warning("Timeout accessing %s on %s", path, self._cfg.host)
+            raise
+        except httpx.ConnectError:
+            _LOGGER.error("Connection failed to %s for path %s", self._cfg.host, path)
+            raise
+        except httpx.HTTPStatusError as err:
+            if err.response.status_code == 401:
+                _LOGGER.error("Authentication failed for %s (check credentials)", self._cfg.host)
+            else:
+                _LOGGER.error("HTTP %d error from %s%s", err.response.status_code, self._cfg.host, path)
+            raise
 
     async def fetch_totals(self) -> Dict[str, float]:
         """Fetch today's total energy values (kWh)."""
@@ -130,39 +158,101 @@ class AiSeg2DataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=scan_interval),
         )
 
+    async def _fetch_with_retry(self, fetch_func, description: str, max_retries: int = 3, retry_delay: float = 2.0):
+        """Fetch data with retry logic."""
+        for attempt in range(max_retries):
+            try:
+                result = await fetch_func()
+                if attempt > 0:
+                    _LOGGER.info("Successfully %s after %d retries", description, attempt)
+                return result
+            except Exception as err:
+                if attempt == max_retries - 1:
+                    _LOGGER.error("Failed to %s after %d attempts: %s", description, max_retries, err)
+                    raise
+                _LOGGER.warning("Attempt %d/%d failed for %s, retrying in %.1fs: %s", 
+                              attempt + 1, max_retries, description, retry_delay, err)
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 1.5  # Exponential backoff
+
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from AiSEG2."""
+        _LOGGER.debug("Starting data fetch from AiSEG2 %s", self.client._cfg.host)
+        
         try:
             # Fetch circuits if not already cached
             if not self.circuits:
-                self.circuits = await self.client.fetch_circuit_catalog()
-                _LOGGER.debug("Found %d circuits", len(self.circuits))
+                _LOGGER.debug("Fetching circuit catalog from %s", self.client._cfg.host)
+                self.circuits = await self._fetch_with_retry(
+                    self.client.fetch_circuit_catalog,
+                    "fetch circuit catalog"
+                )
+                _LOGGER.info("Found %d circuits on %s", len(self.circuits), self.client._cfg.host)
+                for circuit in self.circuits:
+                    _LOGGER.debug("Circuit %s: %s", circuit["id"], circuit["name"])
 
             # Fetch total energy values
-            totals = await self.client.fetch_totals()
+            _LOGGER.debug("Fetching total energy values")
+            totals = await self._fetch_with_retry(
+                self.client.fetch_totals,
+                "fetch total energy values"
+            )
+            _LOGGER.debug("Total energy values: %s", totals)
             
             # Fetch per-circuit values
             circuit_data = {}
             for circuit in self.circuits:
                 circuit_id = circuit["id"]
-                circuit_data[circuit_id] = {
-                    "name": circuit["name"],
-                    "kwh": await self.client.fetch_circuit_kwh(circuit_id),
-                }
+                try:
+                    _LOGGER.debug("Fetching energy for circuit %s (%s)", circuit_id, circuit["name"])
+                    kwh_value = await self._fetch_with_retry(
+                        lambda: self.client.fetch_circuit_kwh(circuit_id),
+                        f"fetch circuit {circuit_id} energy",
+                        max_retries=2  # Fewer retries for individual circuits
+                    )
+                    circuit_data[circuit_id] = {
+                        "name": circuit["name"],
+                        "kwh": kwh_value,
+                    }
+                    _LOGGER.debug("Circuit %s (%s): %.3f kWh", circuit_id, circuit["name"], kwh_value)
+                except Exception as err:
+                    _LOGGER.warning("Failed to fetch data for circuit %s (%s): %s", 
+                                  circuit_id, circuit["name"], err)
+                    # Skip this circuit instead of sending 0.0 (which could be a real value)
+                    continue
             
             # Calculate last reset (today at midnight JST)
             jst = timezone(timedelta(hours=9))
             now = datetime.now(jst)
             last_reset = now.replace(hour=0, minute=0, second=0, microsecond=0)
             
-            return {
+            result = {
                 "totals": totals,
                 "circuits": circuit_data,
                 "last_reset": last_reset.isoformat(),
                 "timestamp": now.isoformat(),
             }
+            
+            _LOGGER.info("Successfully fetched data from AiSEG2 %s: %d total metrics, %d circuits", 
+                        self.client._cfg.host, len(totals), len(circuit_data))
+            return result
+            
+        except httpx.TimeoutException:
+            _LOGGER.error("Timeout connecting to AiSEG2 %s", self.client._cfg.host)
+            raise UpdateFailed("Connection timeout")
+        except httpx.ConnectError:
+            _LOGGER.error("Cannot connect to AiSEG2 %s (check network/IP address)", self.client._cfg.host)
+            raise UpdateFailed("Connection failed")
+        except httpx.HTTPStatusError as err:
+            if err.response.status_code == 401:
+                _LOGGER.error("Authentication failed for AiSEG2 %s (check username/password)", self.client._cfg.host)
+                raise UpdateFailed("Authentication failed")
+            else:
+                _LOGGER.error("HTTP error %d from AiSEG2 %s", err.response.status_code, self.client._cfg.host)
+                raise UpdateFailed(f"HTTP error {err.response.status_code}")
         except Exception as err:
-            raise UpdateFailed(f"Error communicating with AiSEG2: {err}") from err
+            _LOGGER.error("Unexpected error communicating with AiSEG2 %s: %s", self.client._cfg.host, err)
+            raise UpdateFailed(f"Unexpected error: {err}") from err
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -176,10 +266,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     client = AiSeg2Client(config)
     
     # Test the connection
+    _LOGGER.info("Testing connection to AiSEG2 at %s", config.host)
     try:
         await client.fetch_totals()
+        _LOGGER.info("Successfully connected to AiSEG2 at %s", config.host)
+    except httpx.TimeoutException:
+        await client.close()
+        _LOGGER.error("Connection timeout to AiSEG2 %s during setup", config.host)
+        raise ConfigEntryNotReady("Connection timeout - check network connectivity")
+    except httpx.ConnectError:
+        await client.close()
+        _LOGGER.error("Cannot connect to AiSEG2 %s during setup", config.host)
+        raise ConfigEntryNotReady("Cannot connect - check IP address and network")
+    except httpx.HTTPStatusError as err:
+        await client.close()
+        if err.response.status_code == 401:
+            _LOGGER.error("Authentication failed for AiSEG2 %s during setup", config.host)
+            raise ConfigEntryNotReady("Authentication failed - check username and password")
+        else:
+            _LOGGER.error("HTTP error %d from AiSEG2 %s during setup", err.response.status_code, config.host)
+            raise ConfigEntryNotReady(f"HTTP error {err.response.status_code}")
     except Exception as ex:
         await client.close()
+        _LOGGER.error("Unexpected error connecting to AiSEG2 %s: %s", config.host, ex)
         raise ConfigEntryNotReady(f"Cannot connect to AiSEG2: {ex}") from ex
     
     # Create the data update coordinator

@@ -53,7 +53,7 @@ class _Base(CoordinatorEntity, SensorEntity):
             "identifiers": { (DOMAIN, f"aiseg2-{self._host}") },
             "name": f"AiSEG2 ({self._host})",
             "manufacturer": "Panasonic",
-            "model": "AISEG2",
+            "model": "AiSEG2",
         }
 
     @property
