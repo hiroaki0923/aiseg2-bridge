@@ -2,17 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 AISEG2 → MQTT Discovery (per-circuit daily kWh)
-- ブログ記載コードと等価のスクレイピング手順
-  * 各リクエストごとに HTTPDigestAuth を付与
-  * 総量: /page/graph/52111, 53111, 54111, 51111 の <span id="val_kwh"> 先頭
-  * 回路一覧: /page/setting/installation/734 の window.onload JSON(arrayCircuitNameList, strBtnType=="1")
-  * 回路kWh: /page/graph/584?data=base64({"circuitid":"NN"}) の <span id="val_kwh"> 先頭
+- スクレイプ: ブログ検証コードと同等（HTTPDigestAuth、/52111/53111/54111/51111、/584?data=base64({"circuitid":"NN"})）
 - MQTT:
-  * Discovery/config は retain=True
-  * state も retain=True（初回/再起動時に確実に値付与）
-  * 送信は publish → wait_for_publish() でACK待ち（sleep不要）
-- エンティティID: object_id で回路番号固定（sensor.c{ID}）
-- 単発実行想定（定期実行は HA Automation / cron 推奨）
+  * Discovery/config: retain=True
+  * state: retain=True（HA再起動後も直ちに当日値を復元）
+  * publishはACK待ち（wait_for_publish）、sleep不使用
+- エンティティID: object_id を "aiseg2mqtt_..." として固定（例: sensor.aiseg2mqtt_c12）
+- リセット表現: state_class=total + last_reset=当日0:00(JST)
 """
 
 import os
@@ -20,9 +16,8 @@ import sys
 import json
 import base64
 import re
-import datetime as dt
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any
-from zoneinfo import ZoneInfo
 
 import requests
 from requests.auth import HTTPDigestAuth
@@ -34,15 +29,15 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.getenv("AISEG2_ENV_FILE", ".env"))
 
 # ----- Settings -----
-AISEG_HOST = os.getenv("AISEG_HOST", "192.168.0.216")
-AISEG_USER = os.getenv("AISEG_USER", "aiseg")
-AISEG_PASS = os.getenv("AISEG_PASS", "")
+AISEG_HOST   = os.getenv("AISEG_HOST", "192.168.0.216")
+AISEG_USER   = os.getenv("AISEG_USER", "aiseg")
+AISEG_PASS   = os.getenv("AISEG_PASS", "")
 
-MQTT_HOST   = os.getenv("MQTT_HOST", "127.0.0.1")
-MQTT_PORT   = int(os.getenv("MQTT_PORT", "1883"))
-MQTT_USER   = os.getenv("MQTT_USER", "")
-MQTT_PASS   = os.getenv("MQTT_PASS", "")
-MQTT_PREFIX = os.getenv("MQTT_PREFIX", "homeassistant")
+MQTT_HOST    = os.getenv("MQTT_HOST", "127.0.0.1")
+MQTT_PORT    = int(os.getenv("MQTT_PORT", "1883"))
+MQTT_USER    = os.getenv("MQTT_USER", "")
+MQTT_PASS    = os.getenv("MQTT_PASS", "")
+MQTT_PREFIX  = os.getenv("MQTT_PREFIX", "homeassistant")
 
 DEVICE_ID    = os.getenv("DEVICE_ID", "aiseg2-scrape")
 DEVICE_NAME  = os.getenv("DEVICE_NAME", "AISEG2 (Scraped)")
@@ -50,7 +45,14 @@ MANUFACTURER = os.getenv("MANUFACTURER", "Panasonic")
 MODEL        = os.getenv("MODEL", "AISEG2")
 
 AISEG_TIMEOUT = int(os.getenv("AISEG_TIMEOUT", "10"))
-SCAN_TERM     = os.getenv("SCAN_TERM", "day")  # day固定想定
+SCAN_TERM     = os.getenv("SCAN_TERM", "day")  # day 固定想定
+
+# ----- 時刻（JSTの当日0:00をlast_resetに使う） -----
+JST = timezone(timedelta(hours=9))
+def today_reset_iso() -> str:
+    now = datetime.now(JST)
+    reset = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return reset.isoformat()
 
 # ----- HTTP / Parse -----
 def _auth() -> HTTPDigestAuth:
@@ -114,15 +116,15 @@ def fetch_circuit_kwh(circuit_id: str) -> float:
 
 # ----- MQTT -----
 def mqtt_client() -> mqtt.Client:
-    mc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="", protocol=mqtt.MQTTv311)
+    mc = mqtt.Client(protocol=mqtt.MQTTv311)
     if MQTT_USER:
         mc.username_pw_set(MQTT_USER, MQTT_PASS)
     mc.max_inflight_messages_set(100)
     mc.connect(MQTT_HOST, MQTT_PORT, 10)
-    mc.loop_start()  # 送受信ループ開始（ACK処理のため必須）
+    mc.loop_start()  # ACK処理のため必須
     return mc
 
-def publish_and_wait(mc: mqtt.Client, topic: str, payload: str, qos: int = 1, retain: bool = True) -> None:
+def publish_and_wait(mc: mqtt.Client, topic: str, payload: str | None, qos: int = 1, retain: bool = True) -> None:
     """PublishしてACKを待つ（sleep不要）"""
     info = mc.publish(topic, payload, qos=qos, retain=retain)
     info.wait_for_publish()
@@ -143,60 +145,60 @@ def energy_state_topic(uid: str, key: str) -> str:
 def circuit_state_topic(uid: str, cid: str) -> str:
     return f"{MQTT_PREFIX}/aiseg2/{uid}/c{cid}/kwh/state"
 
-def publish_discovery_energy(mc: mqtt.Client, uid: str, key: str, name: str, object_id: str, avty_t: str, attr_t: str) -> str:
+def publish_discovery_energy(mc: mqtt.Client, uid: str, key: str, name: str,
+                             object_id: str, avty_t: str, attr_t: str, last_reset_iso: str) -> str:
+    """
+    合計系（当日使用/買電/売電/発電）。entity_id は object_id に依存。
+    """
     uniq = f"{uid}_{key}"
     cfg_t = f"{MQTT_PREFIX}/sensor/{uniq}/config"
     st_t  = energy_state_topic(uid, key)
-    # 日本時間の今日の0時を計算
-    jst = ZoneInfo("Asia/Tokyo")
-    now_jst = dt.datetime.now(jst)
-    today_midnight_jst = now_jst.replace(hour=0, minute=0, second=0, microsecond=0)
-    
     payload = {
         "name": name,
-        "object_id": f"aiseg2mqtt_{object_id}",   # ← prefix追加
+        "object_id": f"aiseg2mqtt_{object_id}",   # sensor.aiseg2mqtt_total_today 等
         "uniq_id": uniq,
         "dev": {"ids":[uid], "name": DEVICE_NAME, "mf": MANUFACTURER, "mdl": MODEL, "sw": "web-scrape"},
-        "stat_t": st_t, "avty_t": avty_t,
+        "stat_t": st_t,
+        "avty_t": avty_t,
         "dev_cla": "energy",
-        "stat_cla": "total",
+        "stat_cla": "total",        # デイリーリセットの累積値
+        "last_reset": last_reset_iso,
         "unit_of_meas": "kWh",
         "val_tpl": "{{ value_json.kwh }}",
         "json_attr_t": attr_t,
-        "last_reset": today_midnight_jst.isoformat(),
     }
     publish_and_wait(mc, cfg_t, json.dumps(payload, ensure_ascii=False))
     return st_t
 
-def publish_discovery_circuit(mc: mqtt.Client, uid: str, cid: str, cname: str, avty_t: str) -> str:
+def publish_discovery_circuit(mc: mqtt.Client, uid: str, cid: str, cname: str,
+                              avty_t: str, last_reset_iso: str) -> str:
+    """
+    回路別（当日kWh）。entity_id は sensor.aiseg2mqtt_c{cid} に固定。
+    """
     uniq = f"{uid}_c{cid}_kwh"
     cfg_t = f"{MQTT_PREFIX}/sensor/{uniq}/config"
     st_t  = circuit_state_topic(uid, cid)
-    # 日本時間の今日の0時を計算
-    jst = ZoneInfo("Asia/Tokyo")
-    now_jst = dt.datetime.now(jst)
-    today_midnight_jst = now_jst.replace(hour=0, minute=0, second=0, microsecond=0)
-    
     payload = {
         "name": cname,
-        "object_id": f"aiseg2mqtt_c{cid}",   # ← prefix追加
+        "object_id": f"aiseg2mqtt_c{cid}",
         "uniq_id": uniq,
         "dev": {"ids":[uid], "name": DEVICE_NAME, "mf": MANUFACTURER, "mdl": MODEL, "sw": "web-scrape"},
-        "stat_t": st_t, "avty_t": avty_t,
+        "stat_t": st_t,
+        "avty_t": avty_t,
         "dev_cla": "energy",
         "stat_cla": "total",
+        "last_reset": last_reset_iso,
         "unit_of_meas": "kWh",
         "val_tpl": "{{ value_json.kwh }}",
-        "json_attr_t": st_t,
-        "last_reset": today_midnight_jst.isoformat(),
+        "json_attr_t": st_t,  # state payloadを属性にも流用
     }
     publish_and_wait(mc, cfg_t, json.dumps(payload, ensure_ascii=False))
     return st_t
-
 
 # ----- Main -----
 def main() -> None:
     uid = DEVICE_ID
+    last_reset_iso = today_reset_iso()
 
     # 1) データ取得
     circuits = fetch_circuit_catalog()
@@ -206,15 +208,14 @@ def main() -> None:
     # 2) MQTT接続
     mc = mqtt_client()
 
-    # 3) Availability / Meta（retain）
+    # 3) Availability / Meta（retain=True）
     avty_t = availability_topic(uid)
     publish_and_wait(mc, avty_t, "online")
-
     meta_t = meta_topic(uid)
-    meta = {"term": SCAN_TERM, "circuit_count": len(per), "ts": dt.datetime.now().isoformat()}
+    meta = {"term": SCAN_TERM, "circuit_count": len(per), "ts": datetime.now(JST).isoformat()}
     publish_and_wait(mc, meta_t, json.dumps(meta, ensure_ascii=False))
 
-    # 4) Discovery（config retained）
+    # 4) Discovery（config 全件・retain=True）
     total_map = [
         ("total_use_kwh","Total Energy Today","total_today"),
         ("buy_kwh",      "Purchased Energy Today","buy_today"),
@@ -223,15 +224,13 @@ def main() -> None:
     ]
     total_state_topics: Dict[str, str] = {}
     for key, disp, obj in total_map:
-        st = publish_discovery_energy(mc, uid, key, disp, obj, avty_t, meta_t)
+        st = publish_discovery_energy(mc, uid, key, disp, obj, avty_t, meta_t, last_reset_iso)
         total_state_topics[key] = st
 
-    circuit_state_topics: List[Dict[str, str]] = []
     for c in per:
-        st = publish_discovery_circuit(mc, uid, c["id"], c["name"], avty_t)
-        circuit_state_topics.append({"topic": st, "id": c["id"]})
+        publish_discovery_circuit(mc, uid, c["id"], c["name"], avty_t, last_reset_iso)
 
-    # 5) state（retained, ACK待ち）
+    # 5) state（全件・retain=True）
     for key, st in total_state_topics.items():
         publish_and_wait(mc, st, json.dumps({"kwh": totals.get(key, 0.0)}))
 
@@ -247,7 +246,7 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        # 失敗時は availability=offline を残す（ACK待ちで確実に送る）
+        # 失敗時は availability=offline をretainで残す
         try:
             mc = mqtt_client()
             publish_and_wait(mc, availability_topic(DEVICE_ID), "offline")
