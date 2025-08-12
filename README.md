@@ -1,162 +1,148 @@
-# aiseg2mqtt
+# AISEG2 Home Assistant Integration
 
-AISEG2（Panasonic製エネルギーモニター）からデータを取得し、MQTT経由でHome Assistantに連携するブリッジツール。
+AISEG2（Panasonic製エネルギーモニター）からデータを直接取得し、Home Assistantに統合するカスタムコンポーネント。
 
 ## 機能
 
 - AISEG2から電力使用量データを定期的に取得
-- Home Assistant MQTT Discoveryによる自動認識
+- Home Assistantネイティブ統合（MQTT不要）
 - 総量データ（使用量/購入量/売電量/発電量）の取得
 - 回路別の電力使用量（kWh）の取得
 - エラー時の自動リトライとロバストな実行
-- 設定可能な実行間隔
+- Home Assistantのエネルギーダッシュボード対応
 
 ## 必要要件
 
-- Python 3.12以上
+- Home Assistant 2024.1.0以降
 - AISEG2へのネットワークアクセス
-- MQTTブローカー（Mosquittoなど）
 
 ## インストール
 
-```bash
-# リポジトリをクローン
-git clone https://github.com/hiroaki0923/aiseg2mqtt.git
-cd aiseg2mqtt
+### HACS経由（推奨）
 
-# 依存関係をインストール（uvを使用）
-uv sync
-```
+1. HACSで「Custom repositories」を開く
+2. リポジトリURL `https://github.com/hiroaki0923/aiseg2mqtt` を追加
+3. カテゴリで「Integration」を選択
+4. 「AISEG2 (Native)」をインストール
+5. Home Assistantを再起動
+
+### 手動インストール
+
+1. このリポジトリをダウンロード
+2. `custom_components/aiseg2mqtt` フォルダを Home Assistantの `custom_components` ディレクトリにコピー
+3. Home Assistantを再起動
 
 ## 設定
 
-`.env`ファイルを作成し、環境変数を設定します。`.env.example`をコピーして編集することをお勧めします：
+1. Home Assistantの「設定」→「デバイスとサービス」を開く
+2. 「統合を追加」をクリック
+3. 「AISEG2 (Native)」を検索して選択
+4. AISEG2の接続情報を入力：
+   - **ホスト**: AISEG2のIPアドレス（例: 192.168.0.216）
+   - **ユーザー名**: AISEG2のログインユーザー名（通常: aiseg）
+   - **パスワード**: AISEG2のログインパスワード
 
-```bash
-cp .env.example .env
-# .envファイルを編集
-```
+### オプション設定
 
-設定項目：
-
-```env
-# AISEG2接続設定
-AISEG_HOST=192.168.0.216
-AISEG_USER=aiseg
-AISEG_PASS=your_password
-
-# MQTT接続設定
-MQTT_HOST=127.0.0.1
-MQTT_PORT=1883
-MQTT_USER=mqtt_user
-MQTT_PASS=mqtt_password
-MQTT_PREFIX=homeassistant
-
-# デバイス設定
-DEVICE_ID=aiseg2-scrape
-DEVICE_NAME=AISEG2 (Scraped)
-
-# 実行間隔設定（オプション）
-INTERVAL_SECONDS=300  # デフォルト: 300秒（5分）
-MAX_CONSECUTIVE_ERRORS=10  # 最大連続エラー数
-ERROR_RETRY_DELAY=60  # エラー後の待機時間（秒）
-LOG_LEVEL=INFO  # ログレベル（DEBUG/INFO/WARNING/ERROR）
-```
-
-## 使い方
-
-### 単発実行
-
-データを1回だけ取得してMQTTに送信：
-
-```bash
-uv run aiseg2_publish.py
-```
-
-### 定期実行
-
-指定した間隔で継続的にデータを取得：
-
-```bash
-uv run main.py
-```
-
-停止するには `Ctrl+C` を押してください。
-
-### Discovery設定のクリーンアップ
-
-Home AssistantのMQTT Discoveryで作成されたセンサーを削除：
-
-```bash
-uv run aiseg2_clean.py
-```
-
-## Docker での使用
-
-### Docker Hub からイメージを使用（推奨）
-
-```bash
-# 最新版を使用
-docker pull hiroaki0923/aiseg2mqtt:latest
-
-# .envファイルを使用して実行
-docker run --rm --env-file .env hiroaki0923/aiseg2mqtt:latest
-
-# docker-composeを使用
-cp docker-compose.yaml.example docker-compose.yaml
-docker-compose up -d
-```
-
-### ローカルでイメージをビルド
-
-```bash
-docker build -t aiseg2mqtt .
-docker run --rm --env-file .env aiseg2mqtt
-```
-
-### 単発実行
-
-```bash
-# データを1回だけ取得
-docker run --rm --env-file .env hiroaki0923/aiseg2mqtt:latest uv run aiseg2_publish.py
-
-# Discovery設定をクリーンアップ
-docker run --rm --env-file .env hiroaki0923/aiseg2mqtt:latest uv run aiseg2_clean.py
-```
+統合の設定後、「オプション」から以下を変更できます：
+- **スキャン間隔**: データ取得間隔（秒）、デフォルト: 300秒（5分）
 
 ## Home Assistant での表示
 
-MQTT Discoveryにより、以下のセンサーが自動的に作成されます：
+統合により、以下のセンサーが自動的に作成されます：
 
-- `sensor.aiseg2mqtt_total_today` - 本日の総使用量
-- `sensor.aiseg2mqtt_buy_today` - 本日の購入電力量
-- `sensor.aiseg2mqtt_sell_today` - 本日の売電量
-- `sensor.aiseg2mqtt_gen_today` - 本日の発電量
-- `sensor.aiseg2mqtt_c{回路番号}` - 各回路の使用量
+- **Total Energy Today** - 本日の総使用量
+- **Purchased Energy Today** - 本日の購入電力量  
+- **Sold Energy Today** - 本日の売電量
+- **Generated Energy Today** - 本日の発電量
+- **回路名** - 各回路の使用量（回路設定に応じて）
+
+全てのセンサーは `device_class: energy` で、Home Assistantのエネルギーダッシュボードで使用できます。
+
+## 開発者向け情報
+
+### 開発環境セットアップ
+
+```bash
+# Git hooks をセットアップ (コード品質チェック)
+./setup-hooks.sh
+
+# 手動でコードチェックを実行
+./lint-check.sh
+
+# 自動修正付きでチェック実行
+./lint-check.sh --fix
+
+# 特定のファイルのみチェック
+./lint-check.sh custom_components/aiseg2mqtt/__init__.py
+
+# 特定のファイルのみ自動修正
+./lint-check.sh --fix custom_components/aiseg2mqtt/__init__.py
+
+# または直接修正スクリプトを実行
+./lint-fix.sh
+```
+
+### 推奨開発ツール
+
+```bash
+# コード品質チェック用
+pip install flake8 pylint mypy
+
+# 自動コード整形用
+pip install autopep8 black isort
+
+# JSON検証のため
+brew install jq  # macOS
+# または
+apt-get install jq  # Linux
+```
+
+### コードチェック・修正機能
+
+#### チェック内容
+- Python構文エラーチェック
+- flake8による品質チェック
+- Home Assistant固有パターンの検証
+- manifest.json妥当性検証
+
+#### 自動修正機能
+- **autopep8**: PEP8準拠の自動整形
+- **black**: 統一されたコードスタイル適用
+- **isort**: import文の自動ソート
+- **手動修正**: 空白、改行、基本的なスタイル問題
+- **バックアップ**: 修正前の自動バックアップ作成
 
 ## 動作の仕組み
 
 1. AISEG2のWebインターフェースにHTTP Digest認証でアクセス
 2. HTMLをパースして電力データを抽出
-3. MQTTブローカーにHome Assistant Discovery形式で送信
-4. 指定された間隔で定期的に実行（`main.py`使用時）
+3. Home Assistantのセンサーとして直接データを提供
+4. 設定された間隔で定期的にデータを更新
 
 ## トラブルシューティング
 
-### 認証エラーが発生する場合
+### 統合の追加でエラーが発生する場合
 
-- AISEG2のユーザー名とパスワードが正しいか確認
 - AISEG2のIPアドレスが正しいか確認
+- ユーザー名とパスワードが正しいか確認
+- Home AssistantからAISEG2にネットワーク接続できるか確認
 
-### MQTTに接続できない場合
+### センサーが「利用不可」になる場合
 
-- MQTTブローカーが起動しているか確認
-- ファイアウォールの設定を確認
-- MQTT認証情報が正しいか確認
+- AISEG2の電源が入っているか確認
+- ネットワーク接続を確認
+- ログを確認（設定→システム→ログ）
 
 ### データが取得できない場合
 
 - AISEG2のファームウェアバージョンによってはWebインターフェースが異なる可能性があります
+- ログでHTTPエラーやタイムアウトをチェック
+
+## ログの確認
+
+Home Assistantの「設定」→「システム」→「ログ」でエラー詳細を確認できます。
+統合は詳細なログ出力に対応しており、問題の特定が容易です。
 
 ## 免責事項
 
@@ -164,7 +150,7 @@ MQTT Discoveryにより、以下のセンサーが自動的に作成されます
 
 - 本ツールの使用は自己責任でお願いします
 - AISEG2デバイスへの過度なアクセスは機器の動作に影響を与える可能性があります
-- 適切な実行間隔（`INTERVAL_SECONDS`）を設定し、デバイスへの負荷を最小限に抑えてください
+- 適切な実行間隔を設定し、デバイスへの負荷を最小限に抑えてください
 - 本ツールの使用によって生じたいかなる損害についても、作者は責任を負いません
 - AISEG2は株式会社パナソニックの製品であり、本ツールは非公式のものです
 

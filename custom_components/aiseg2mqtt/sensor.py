@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import datetime, timezone, timedelta
-from typing import Any, Optional
+from typing import Optional
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import UnitOfEnergy
@@ -19,6 +19,9 @@ TOTAL_KEYS = [
     ("gen_kwh", "Generated Energy Today"),
 ]
 
+
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
     host = entry.data["host"]
@@ -36,6 +39,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     async_add_entities(ents)
 
+
+
+
 class _Base(CoordinatorEntity, SensorEntity):
     _attr_device_class = "energy"
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
@@ -50,7 +56,7 @@ class _Base(CoordinatorEntity, SensorEntity):
     @property
     def device_info(self):
         return {
-            "identifiers": { (DOMAIN, f"aiseg2-{self._host}") },
+            "identifiers": {(DOMAIN, f"aiseg2-{self._host}")},
             "name": f"AiSEG2 ({self._host})",
             "manufacturer": "Panasonic",
             "model": "AiSEG2",
@@ -60,6 +66,9 @@ class _Base(CoordinatorEntity, SensorEntity):
     def last_reset(self) -> datetime:
         now = datetime.now(JST)
         return now.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=JST)
+
+
+
 
 class TotalEnergySensor(_Base):
     def __init__(self, coordinator, entry: ConfigEntry, host: str, key: str, disp_name: str):
@@ -73,6 +82,9 @@ class TotalEnergySensor(_Base):
         totals = self.coordinator.data.get("totals", {})
         v = totals.get(self._key)
         return float(v) if v is not None else None
+
+
+
 
 class CircuitEnergySensor(_Base):
     def __init__(self, coordinator, entry: ConfigEntry, host: str, cid: str, cname: str):
