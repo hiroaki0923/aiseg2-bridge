@@ -51,17 +51,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Docker Hub description update disabled due to API permission issues
-      # Can be manually updated via Docker Hub web interface
-      # - name: Update Docker Hub description
-      #   uses: peter-evans/dockerhub-description@v4
-      #   continue-on-error: true
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
-      #     repository: ${{ env.DOCKER_REPO }}
-      #     readme-filepath: ./README.md
-      #     short-description: "AISEG2 to MQTT bridge for Home Assistant integration"
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v4
+        continue-on-error: true
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ env.DOCKER_REPO }}
+          readme-filepath: ./README.md
+          short-description: "AISEG2 to MQTT bridge for Home Assistant integration"
 
   create-release:
     needs: build-and-push
