@@ -1,7 +1,7 @@
 {
   "domain": "aiseg2_bridge",
   "name": "AiSEG2 Bridge",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "documentation": "https://github.com/hiroaki0923/aiseg2-bridge",
   "issue_tracker": "https://github.com/hiroaki0923/aiseg2-bridge/issues",
   "requirements": ["httpx>=0.27.0", "lxml>=5.2.0"],
