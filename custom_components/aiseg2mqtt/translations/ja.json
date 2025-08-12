@@ -1,0 +1,27 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "AiSEG2 への接続",
+        "data": {
+          "host": "AiSEG2 の IP またはホスト名",
+          "user": "ユーザー名",
+          "password": "パスワード"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "接続できません。ホスト/認証情報を確認してください。"
+    }
+  },
+  "options": {
+    "step": {
+      "options": {
+        "title": "オプション",
+        "data": {
+          "scan_interval": "更新間隔（秒, 30〜3600）"
+        }
+      }
+    }
+  }
+}
