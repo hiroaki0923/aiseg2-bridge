@@ -9,5 +9,6 @@
   "iot_class": "local_polling",
   "integration_type": "device",
   "config_flow": true,
-  "loggers": ["aiseg2_bridge", "httpx"]
+  "loggers": ["aiseg2_bridge", "httpx"],
+  "integration_icon": "mdi:home-lightning-bolt"
 }
