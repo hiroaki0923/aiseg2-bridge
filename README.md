@@ -21,7 +21,7 @@ AiSEG2（Panasonic製エネルギーモニター）とHome Assistantを接続す
 ### HACS経由（推奨）
 
 1. HACSで「Custom repositories」を開く
-2. リポジトリURL `https://github.com/hiroaki0923/aiseg2mqtt` を追加
+2. リポジトリURL `https://github.com/hiroaki0923/aiseg2-bridge` を追加
 3. カテゴリで「Integration」を選択
 4. 「AiSEG2 Bridge」をインストール
 5. Home Assistantを再起動

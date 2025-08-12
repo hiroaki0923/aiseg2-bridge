@@ -60,7 +60,7 @@ Unlike Docker-based workflows, this HACS workflow doesn't require any repository
 
 ## Release Location
 
-Releases will be available at: `https://github.com/hiroaki0923/aiseg2mqtt/releases`
+Releases will be available at: `https://github.com/hiroaki0923/aiseg2-bridge/releases`
 
 Users can install the integration through:
 - HACS (recommended)
