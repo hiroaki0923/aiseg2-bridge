@@ -1,41 +1,67 @@
 # GitHub Actions Setup
 
-## Required Secrets
+## HACS Integration Release Workflow
 
-Before using the Docker publish workflow, you need to set up the following secrets in your GitHub repository:
+This repository uses GitHub Actions to automate the release process for the Home Assistant Custom Component (HACS integration).
 
-1. `DOCKERHUB_USERNAME` - Your Docker Hub username
-2. `DOCKERHUB_TOKEN` - Your Docker Hub access token (not password)
+## Setup (First Time Only)
 
-### How to create Docker Hub access token:
-
-1. Log in to [Docker Hub](https://hub.docker.com)
-2. Go to Account Settings → Security
-3. Click "New Access Token"
-4. Give it a descriptive name (e.g., "GitHub Actions for aiseg2mqtt")
-5. Copy the token (you won't be able to see it again)
-
-### How to add secrets to GitHub:
-
-1. Go to your repository on GitHub
-2. Click on Settings → Secrets and variables → Actions
-3. Click "New repository secret"
-4. Add both `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`
-
-## Triggering the workflow
-
-The workflow will automatically run when you create a new tag:
+Before creating releases, you need to install git hooks:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+# Install git hooks for automatic version management
+./setup-hooks.sh
 ```
 
-This will:
-1. Build and push Docker images for both x86_64 (amd64) and ARM64 (aarch64) architectures
-2. Create a GitHub Release with:
-   - Auto-generated changelog from commit messages
-   - Docker pull instructions
-   - Link to README for installation guide
+This installs a pre-push hook that automatically updates `manifest.json` when you push version tags.
 
-The release will be available at: `https://github.com/hiroaki0923/aiseg2mqtt/releases`
+## What happens when you create a release tag
+
+When you push a version tag (e.g., `v0.3.0`):
+
+1. **Pre-push hook** (local) - Automatically updates `manifest.json` version and commits the change
+2. **HACS Validation** (GitHub) - Validates the integration against HACS standards  
+3. **Create GitHub Release** (GitHub) - Creates a release with HACS installation instructions
+
+## Creating a release
+
+To create a new release:
+
+```bash
+# Create and push a version tag
+git tag v0.3.0
+git push origin v0.3.0  # Pre-push hook auto-updates manifest.json
+```
+
+The version should follow semantic versioning (e.g., `v1.2.3`).
+
+## Workflow Details
+
+### Jobs
+
+1. **validate-hacs**: Runs HACS validation to ensure integration compatibility
+2. **create-release**: Creates a GitHub release with installation instructions and changelog
+
+### Local Automation
+
+- **pre-push hook**: Automatically updates `manifest.json` version when pushing version tags
+
+### Generated Release Content
+
+The release will include:
+- HACS installation instructions
+- Manual installation steps
+- Auto-generated changelog from commit messages
+- Links to documentation
+
+## No Additional Setup Required
+
+Unlike Docker-based workflows, this HACS workflow doesn't require any repository secrets or external service configuration. It uses the built-in `GITHUB_TOKEN` for all operations.
+
+## Release Location
+
+Releases will be available at: `https://github.com/hiroaki0923/aiseg2-bridge/releases`
+
+Users can install the integration through:
+- HACS (recommended)
+- Manual download from GitHub releases

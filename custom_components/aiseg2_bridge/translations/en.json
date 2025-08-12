@@ -1,0 +1,27 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to AiSEG2",
+        "data": {
+          "host": "Host/IP",
+          "user": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect. Check host/credentials."
+    }
+  },
+  "options": {
+    "step": {
+      "options": {
+        "title": "Options",
+        "data": {
+          "scan_interval": "Update interval (sec, 30–3600)"
+        }
+      }
+    }
+  }
+}
