@@ -70,7 +70,12 @@ fi
 
 # Check for common Python issues using basic tools
 if command_exists flake8; then
-    run_check "flake8" "flake8 --select=E9,F63,F7,F82 $PYTHON_FILES" "critical error checking with flake8"
+    # Create a file list for flake8
+    FILE_LIST=""
+    for file in $PYTHON_FILES; do
+        FILE_LIST="$FILE_LIST $file"
+    done
+    run_check "flake8" "flake8 --select=E9,F63,F7,F82 $FILE_LIST" "critical error checking with flake8"
 elif command_exists python3; then
     # Basic import check
     echo -e "${BLUE}Running basic import checks...${NC}"

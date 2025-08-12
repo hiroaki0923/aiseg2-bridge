@@ -1,12 +1,13 @@
 from __future__ import annotations
-from datetime import datetime, timezone, timedelta
+
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfEnergy
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.config_entries import ConfigEntry
 
 from .const import DOMAIN
 
@@ -18,8 +19,6 @@ TOTAL_KEYS = [
     ("sell_kwh", "Sold Energy Today"),
     ("gen_kwh", "Generated Energy Today"),
 ]
-
-
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
@@ -38,8 +37,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             ents.append(CircuitEnergySensor(coordinator, entry, host, cid, cdata["name"]))
 
     async_add_entities(ents)
-
-
 
 
 class _Base(CoordinatorEntity, SensorEntity):
@@ -68,8 +65,6 @@ class _Base(CoordinatorEntity, SensorEntity):
         return now.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=JST)
 
 
-
-
 class TotalEnergySensor(_Base):
     def __init__(self, coordinator, entry: ConfigEntry, host: str, key: str, disp_name: str):
         super().__init__(coordinator, entry, host)
@@ -82,8 +77,6 @@ class TotalEnergySensor(_Base):
         totals = self.coordinator.data.get("totals", {})
         v = totals.get(self._key)
         return float(v) if v is not None else None
-
-
 
 
 class CircuitEnergySensor(_Base):

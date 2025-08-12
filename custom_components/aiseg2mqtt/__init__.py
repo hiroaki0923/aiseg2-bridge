@@ -1,4 +1,5 @@
 """AiSEG2 to MQTT Integration for Home Assistant."""
+
 from __future__ import annotations
 
 import asyncio
@@ -25,20 +26,22 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 # Regex for number extraction
-_NUM = re.compile(r'([0-9]+(?:\.[0-9]+)?)')
+_NUM = re.compile(r"([0-9]+(?:\.[0-9]+)?)")
+
 
 def _to_float(s: Optional[str]) -> float:
     """Convert string to float, handling Japanese characters."""
-    if not s: 
+    if not s:
         return 0.0
     try:
-        t = s.replace('，', ',').replace('．', '.').replace(',', '')
+        t = s.replace("，", ",").replace("．", ".").replace(",", "")
         m = _NUM.search(t)
         value = float(m.group(1)) if m else 0.0
         return _validate_energy_value(value, s)
     except (ValueError, TypeError) as err:
         _LOGGER.warning("Failed to parse energy value '%s': %s", s, err)
         return 0.0
+
 
 def _validate_energy_value(value: float, original_str: str) -> float:
     """Validate energy values are reasonable."""
@@ -54,6 +57,7 @@ def _validate_energy_value(value: float, original_str: str) -> float:
 @dataclass
 class AiSeg2Config:
     """Configuration for AiSEG2 client."""
+
     host: str
     user: str = "aiseg"
     password: str = ""
@@ -62,7 +66,7 @@ class AiSeg2Config:
 
 class AiSeg2Client:
     """Async client for AiSEG2 pages (Digest auth)."""
-    
+
     def __init__(self, cfg: AiSeg2Config):
         """Initialize the client."""
         self._cfg = cfg
@@ -70,7 +74,7 @@ class AiSeg2Client:
             base_url=f"http://{cfg.host}",
             timeout=cfg.timeout,
             auth=httpx.DigestAuth(cfg.user, cfg.password),
-            headers={"User-Agent": "aiseg2/ha-integration"}
+            headers={"User-Agent": "aiseg2/ha-integration"},
         )
 
     async def close(self):
@@ -100,10 +104,26 @@ class AiSeg2Client:
     async def fetch_totals(self) -> Dict[str, float]:
         """Fetch today's total energy values (kWh)."""
         return {
-            "total_use_kwh": _to_float((await self._get_html_texts("/page/graph/52111", '//span[@id="val_kwh"]/text()'))[:1][0] if (await self._get_html_texts("/page/graph/52111", '//span[@id="val_kwh"]/text()')) else None),
-            "buy_kwh":       _to_float((await self._get_html_texts("/page/graph/53111", '//span[@id="val_kwh"]/text()'))[:1][0] if (await self._get_html_texts("/page/graph/53111", '//span[@id="val_kwh"]/text()')) else None),
-            "sell_kwh":      _to_float((await self._get_html_texts("/page/graph/54111", '//span[@id="val_kwh"]/text()'))[:1][0] if (await self._get_html_texts("/page/graph/54111", '//span[@id="val_kwh"]/text()')) else None),
-            "gen_kwh":       _to_float((await self._get_html_texts("/page/graph/51111", '//span[@id="val_kwh"]/text()'))[:1][0] if (await self._get_html_texts("/page/graph/51111", '//span[@id="val_kwh"]/text()')) else None),
+            "total_use_kwh": _to_float(
+                (await self._get_html_texts("/page/graph/52111", '//span[@id="val_kwh"]/text()'))[:1][0]
+                if (await self._get_html_texts("/page/graph/52111", '//span[@id="val_kwh"]/text()'))
+                else None
+            ),
+            "buy_kwh": _to_float(
+                (await self._get_html_texts("/page/graph/53111", '//span[@id="val_kwh"]/text()'))[:1][0]
+                if (await self._get_html_texts("/page/graph/53111", '//span[@id="val_kwh"]/text()'))
+                else None
+            ),
+            "sell_kwh": _to_float(
+                (await self._get_html_texts("/page/graph/54111", '//span[@id="val_kwh"]/text()'))[:1][0]
+                if (await self._get_html_texts("/page/graph/54111", '//span[@id="val_kwh"]/text()'))
+                else None
+            ),
+            "gen_kwh": _to_float(
+                (await self._get_html_texts("/page/graph/51111", '//span[@id="val_kwh"]/text()'))[:1][0]
+                if (await self._get_html_texts("/page/graph/51111", '//span[@id="val_kwh"]/text()'))
+                else None
+            ),
         }
 
     async def fetch_circuit_catalog(self) -> List[Dict[str, str]]:
@@ -112,18 +132,18 @@ class AiSeg2Client:
         r.raise_for_status()
         root = html.fromstring(r.content)
         scripts = root.xpath('//script[contains(text(), "window.onload")]')
-        if not scripts: 
+        if not scripts:
             return []
         text = scripts[0].text or ""
-        l, rpos = text.find('('), text.rfind(')')
-        if l < 0 or rpos <= l: 
+        l, rpos = text.find("("), text.rfind(")")
+        if l < 0 or rpos <= l:
             return []
-        data = json.loads(text[l+1:rpos].strip())
-        out: List[Dict[str,str]] = []
-        for c in data.get('arrayCircuitNameList', []):
-            if c.get('strBtnType') == "1":
-                cid = str(c.get('strId'))
-                name = str(c.get('strCircuit') or f"Circuit {cid}")
+        data = json.loads(text[l + 1 : rpos].strip())
+        out: List[Dict[str, str]] = []
+        for c in data.get("arrayCircuitNameList", []):
+            if c.get("strBtnType") == "1":
+                cid = str(c.get("strId"))
+                name = str(c.get("strCircuit") or f"Circuit {cid}")
                 out.append({"id": cid, "name": name})
         return out
 
@@ -150,7 +170,7 @@ class AiSeg2DataUpdateCoordinator(DataUpdateCoordinator):
         """Initialize the data update coordinator."""
         self.client = client
         self.circuits: List[Dict[str, str]] = []
-        
+
         super().__init__(
             hass,
             _LOGGER,
@@ -170,35 +190,35 @@ class AiSeg2DataUpdateCoordinator(DataUpdateCoordinator):
                 if attempt == max_retries - 1:
                     _LOGGER.error("Failed to %s after %d attempts: %s", description, max_retries, err)
                     raise
-                _LOGGER.warning("Attempt %d/%d failed for %s, retrying in %.1fs: %s", 
-                              attempt + 1, max_retries, description, retry_delay, err)
+                _LOGGER.warning(
+                    "Attempt %d/%d failed for %s, retrying in %.1fs: %s",
+                    attempt + 1,
+                    max_retries,
+                    description,
+                    retry_delay,
+                    err,
+                )
                 await asyncio.sleep(retry_delay)
                 retry_delay *= 1.5  # Exponential backoff
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from AiSEG2."""
         _LOGGER.debug("Starting data fetch from AiSEG2 %s", self.client._cfg.host)
-        
+
         try:
             # Fetch circuits if not already cached
             if not self.circuits:
                 _LOGGER.debug("Fetching circuit catalog from %s", self.client._cfg.host)
-                self.circuits = await self._fetch_with_retry(
-                    self.client.fetch_circuit_catalog,
-                    "fetch circuit catalog"
-                )
+                self.circuits = await self._fetch_with_retry(self.client.fetch_circuit_catalog, "fetch circuit catalog")
                 _LOGGER.info("Found %d circuits on %s", len(self.circuits), self.client._cfg.host)
                 for circuit in self.circuits:
                     _LOGGER.debug("Circuit %s: %s", circuit["id"], circuit["name"])
 
             # Fetch total energy values
             _LOGGER.debug("Fetching total energy values")
-            totals = await self._fetch_with_retry(
-                self.client.fetch_totals,
-                "fetch total energy values"
-            )
+            totals = await self._fetch_with_retry(self.client.fetch_totals, "fetch total energy values")
             _LOGGER.debug("Total energy values: %s", totals)
-            
+
             # Fetch per-circuit values
             circuit_data = {}
             for circuit in self.circuits:
@@ -208,7 +228,7 @@ class AiSeg2DataUpdateCoordinator(DataUpdateCoordinator):
                     kwh_value = await self._fetch_with_retry(
                         lambda: self.client.fetch_circuit_kwh(circuit_id),
                         f"fetch circuit {circuit_id} energy",
-                        max_retries=2  # Fewer retries for individual circuits
+                        max_retries=2,  # Fewer retries for individual circuits
                     )
                     circuit_data[circuit_id] = {
                         "name": circuit["name"],
@@ -216,27 +236,30 @@ class AiSeg2DataUpdateCoordinator(DataUpdateCoordinator):
                     }
                     _LOGGER.debug("Circuit %s (%s): %.3f kWh", circuit_id, circuit["name"], kwh_value)
                 except Exception as err:
-                    _LOGGER.warning("Failed to fetch data for circuit %s (%s): %s", 
-                                  circuit_id, circuit["name"], err)
+                    _LOGGER.warning("Failed to fetch data for circuit %s (%s): %s", circuit_id, circuit["name"], err)
                     # Skip this circuit instead of sending 0.0 (which could be a real value)
                     continue
-            
+
             # Calculate last reset (today at midnight JST)
             jst = timezone(timedelta(hours=9))
             now = datetime.now(jst)
             last_reset = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            
+
             result = {
                 "totals": totals,
                 "circuits": circuit_data,
                 "last_reset": last_reset.isoformat(),
                 "timestamp": now.isoformat(),
             }
-            
-            _LOGGER.info("Successfully fetched data from AiSEG2 %s: %d total metrics, %d circuits", 
-                        self.client._cfg.host, len(totals), len(circuit_data))
+
+            _LOGGER.info(
+                "Successfully fetched data from AiSEG2 %s: %d total metrics, %d circuits",
+                self.client._cfg.host,
+                len(totals),
+                len(circuit_data),
+            )
             return result
-            
+
         except httpx.TimeoutException:
             _LOGGER.error("Timeout connecting to AiSEG2 %s", self.client._cfg.host)
             raise UpdateFailed("Connection timeout")
@@ -262,9 +285,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         user=entry.data["username"],
         password=entry.data["password"],
     )
-    
+
     client = AiSeg2Client(config)
-    
+
     # Test the connection
     _LOGGER.info("Testing connection to AiSEG2 at %s", config.host)
     try:
@@ -290,27 +313,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await client.close()
         _LOGGER.error("Unexpected error connecting to AiSEG2 %s: %s", config.host, ex)
         raise ConfigEntryNotReady(f"Cannot connect to AiSEG2: {ex}") from ex
-    
+
     # Create the data update coordinator
     coordinator = AiSeg2DataUpdateCoordinator(
         hass,
         client,
         entry.options.get("scan_interval", 300),
     )
-    
+
     # Fetch initial data
     await coordinator.async_config_entry_first_refresh()
-    
+
     # Store coordinator
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
-    
+
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    
+
     # Register update listener
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
-    
+
     return True
 
 
@@ -318,13 +341,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     # Unload platforms
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    
+
     if unload_ok:
         # Get coordinator
         coordinator = hass.data[DOMAIN].pop(entry.entry_id)
         # Close the client
         await coordinator.client.close()
-    
+
     return unload_ok
 
 

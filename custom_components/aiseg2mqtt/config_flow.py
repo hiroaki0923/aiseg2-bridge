@@ -1,23 +1,26 @@
 from __future__ import annotations
-import voluptuous as vol
+
 from typing import Any
 
+import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import DOMAIN, CONF_SCAN_INTERVAL, DEFAULT_USER, DEFAULT_SCAN_INTERVAL
 from . import AiSeg2Client, AiSeg2Config
+from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DEFAULT_USER, DOMAIN
 
-DATA_SCHEMA = vol.Schema({
-    vol.Required("host"): str,
-    vol.Optional("username", default=DEFAULT_USER): str,
-    vol.Optional("password", default=""): str,
-})
+DATA_SCHEMA = vol.Schema(
+    {
+        vol.Required("host"): str,
+        vol.Optional("username", default=DEFAULT_USER): str,
+        vol.Optional("password", default=""): str,
+    }
+)
 
-OPTIONS_SCHEMA = vol.Schema({
-    vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(int, vol.Range(min=30, max=3600))
-})
+OPTIONS_SCHEMA = vol.Schema(
+    {vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(int, vol.Range(min=30, max=3600))}
+)
+
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
@@ -30,18 +33,21 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 host=user_input["host"],
                 user=user_input.get("username", DEFAULT_USER),
                 password=user_input.get("password", ""),
-                timeout=10.0
+                timeout=10.0,
             )
             client = AiSeg2Client(cfg)
             try:
                 # 軽いリクエストで疎通確認
                 await client.fetch_circuit_catalog()
                 await client.close()
-                return self.async_create_entry(title=f"AiSEG2 ({cfg.host})", data={
-                    "host": cfg.host,
-                    "username": cfg.user,
-                    "password": cfg.password,
-                })
+                return self.async_create_entry(
+                    title=f"AiSEG2 ({cfg.host})",
+                    data={
+                        "host": cfg.host,
+                        "username": cfg.user,
+                        "password": cfg.password,
+                    },
+                )
             except Exception:
                 await client.close()
                 errors["base"] = "cannot_connect"
@@ -62,6 +68,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     def async_get_options_flow(config_entry):
         return OptionsFlow(config_entry)
+
 
 class OptionsFlow(config_entries.OptionsFlow):
     def __init__(self, entry: config_entries.ConfigEntry):
