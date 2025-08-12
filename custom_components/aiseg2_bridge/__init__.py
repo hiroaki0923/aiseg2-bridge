@@ -70,19 +70,27 @@ class AiSeg2Client:
     def __init__(self, cfg: AiSeg2Config):
         """Initialize the client."""
         self._cfg = cfg
-        self._client = httpx.AsyncClient(
-            base_url=f"http://{cfg.host}",
-            timeout=cfg.timeout,
-            auth=httpx.DigestAuth(cfg.user, cfg.password),
-            headers={"User-Agent": "aiseg2/ha-integration"},
-        )
+        self._client: httpx.AsyncClient | None = None
+
+    async def _ensure_client(self):
+        """Ensure the httpx client is initialized."""
+        if self._client is None:
+            self._client = httpx.AsyncClient(
+                base_url=f"http://{self._cfg.host}",
+                timeout=self._cfg.timeout,
+                auth=httpx.DigestAuth(self._cfg.user, self._cfg.password),
+                headers={"User-Agent": "aiseg2/ha-integration"},
+            )
 
     async def close(self):
         """Close the HTTP client."""
-        await self._client.aclose()
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
 
     async def _get_html_texts(self, path: str, xpath: str) -> List[str]:
         """Fetch HTML and extract text using XPath."""
+        await self._ensure_client()
         try:
             r = await self._client.get(path)
             r.raise_for_status()
@@ -128,6 +136,7 @@ class AiSeg2Client:
 
     async def fetch_circuit_catalog(self) -> List[Dict[str, str]]:
         """Fetch list of available circuits."""
+        await self._ensure_client()
         r = await self._client.get("/page/setting/installation/734")
         r.raise_for_status()
         root = html.fromstring(r.content)
@@ -149,6 +158,7 @@ class AiSeg2Client:
 
     async def fetch_circuit_kwh(self, circuit_id: str) -> float:
         """Fetch energy consumption for a specific circuit."""
+        await self._ensure_client()
         params = {"circuitid": str(circuit_id)}
         b64 = base64.b64encode(json.dumps(params).encode()).decode()
         r = await self._client.get(f"/page/graph/584?data={b64}")
