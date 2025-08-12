@@ -73,9 +73,9 @@ if command -v flake8 >/dev/null 2>&1; then
 fi
 
 # 3. Check manifest.json (if no specific files given)
-if [[ "$FILES" == *"custom_components"* ]] && [[ -f "custom_components/aiseg2mqtt/manifest.json" ]]; then
+if [[ "$FILES" == *"custom_components"* ]] && [[ -f "custom_components/aiseg2_bridge/manifest.json" ]]; then
     echo -e "${BLUE}Checking manifest.json...${NC}"
-    if python3 -c "import json; json.load(open('custom_components/aiseg2mqtt/manifest.json'))" 2>/dev/null; then
+    if python3 -c "import json; json.load(open('custom_components/aiseg2_bridge/manifest.json'))" 2>/dev/null; then
         echo -e "${GREEN}✅ manifest.json: Valid${NC}"
     else
         echo -e "${RED}❌ manifest.json: Invalid JSON${NC}"

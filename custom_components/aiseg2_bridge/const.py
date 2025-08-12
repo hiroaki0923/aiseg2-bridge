@@ -1,4 +1,4 @@
-DOMAIN = "aiseg2mqtt"
+DOMAIN = "aiseg2_bridge"
 
 CONF_HOST = "host"
 CONF_USER = "user"

@@ -1,10 +1,10 @@
-# AISEG2 Home Assistant Integration
+# AiSEG2 Bridge for Home Assistant
 
-AISEG2（Panasonic製エネルギーモニター）からデータを直接取得し、Home Assistantに統合するカスタムコンポーネント。
+AiSEG2（Panasonic製エネルギーモニター）とHome Assistantを接続するブリッジ統合。
 
 ## 機能
 
-- AISEG2から電力使用量データを定期的に取得
+- AiSEG2から電力使用量データを定期的に取得
 - Home Assistantネイティブ統合（MQTT不要）
 - 総量データ（使用量/購入量/売電量/発電量）の取得
 - 回路別の電力使用量（kWh）の取得
@@ -14,7 +14,7 @@ AISEG2（Panasonic製エネルギーモニター）からデータを直接取�
 ## 必要要件
 
 - Home Assistant 2024.1.0以降
-- AISEG2へのネットワークアクセス
+- AiSEG2へのネットワークアクセス
 
 ## インストール
 
@@ -23,24 +23,24 @@ AISEG2（Panasonic製エネルギーモニター）からデータを直接取�
 1. HACSで「Custom repositories」を開く
 2. リポジトリURL `https://github.com/hiroaki0923/aiseg2mqtt` を追加
 3. カテゴリで「Integration」を選択
-4. 「AISEG2 (Native)」をインストール
+4. 「AiSEG2 Bridge」をインストール
 5. Home Assistantを再起動
 
 ### 手動インストール
 
 1. このリポジトリをダウンロード
-2. `custom_components/aiseg2mqtt` フォルダを Home Assistantの `custom_components` ディレクトリにコピー
+2. `custom_components/aiseg2_bridge` フォルダを Home Assistantの `custom_components` ディレクトリにコピー
 3. Home Assistantを再起動
 
 ## 設定
 
 1. Home Assistantの「設定」→「デバイスとサービス」を開く
 2. 「統合を追加」をクリック
-3. 「AISEG2 (Native)」を検索して選択
-4. AISEG2の接続情報を入力：
-   - **ホスト**: AISEG2のIPアドレス（例: 192.168.0.216）
-   - **ユーザー名**: AISEG2のログインユーザー名（通常: aiseg）
-   - **パスワード**: AISEG2のログインパスワード
+3. 「AiSEG2 Bridge」を検索して選択
+4. AiSEG2の接続情報を入力：
+   - **ホスト**: AiSEG2のIPアドレス（例: 192.168.0.216）
+   - **ユーザー名**: AiSEG2のログインユーザー名（通常: aiseg）
+   - **パスワード**: AiSEG2のログインパスワード
 
 ### オプション設定
 
@@ -74,10 +74,10 @@ AISEG2（Panasonic製エネルギーモニター）からデータを直接取�
 ./lint-check.sh --fix
 
 # 特定のファイルのみチェック
-./lint-check.sh custom_components/aiseg2mqtt/__init__.py
+./lint-check.sh custom_components/aiseg2_bridge/__init__.py
 
 # 特定のファイルのみ自動修正
-./lint-check.sh --fix custom_components/aiseg2mqtt/__init__.py
+./lint-check.sh --fix custom_components/aiseg2_bridge/__init__.py
 
 # または直接修正スクリプトを実行
 ./lint-fix.sh
@@ -115,7 +115,7 @@ apt-get install jq  # Linux
 
 ## 動作の仕組み
 
-1. AISEG2のWebインターフェースにHTTP Digest認証でアクセス
+1. AiSEG2のWebインターフェースにHTTP Digest認証でアクセス
 2. HTMLをパースして電力データを抽出
 3. Home Assistantのセンサーとして直接データを提供
 4. 設定された間隔で定期的にデータを更新
@@ -124,19 +124,19 @@ apt-get install jq  # Linux
 
 ### 統合の追加でエラーが発生する場合
 
-- AISEG2のIPアドレスが正しいか確認
+- AiSEG2のIPアドレスが正しいか確認
 - ユーザー名とパスワードが正しいか確認
-- Home AssistantからAISEG2にネットワーク接続できるか確認
+- Home AssistantからAiSEG2にネットワーク接続できるか確認
 
 ### センサーが「利用不可」になる場合
 
-- AISEG2の電源が入っているか確認
+- AiSEG2の電源が入っているか確認
 - ネットワーク接続を確認
 - ログを確認（設定→システム→ログ）
 
 ### データが取得できない場合
 
-- AISEG2のファームウェアバージョンによってはWebインターフェースが異なる可能性があります
+- AiSEG2のファームウェアバージョンによってはWebインターフェースが異なる可能性があります
 - ログでHTTPエラーやタイムアウトをチェック
 
 ## ログの確認
@@ -146,13 +146,13 @@ Home Assistantの「設定」→「システム」→「ログ」でエラー詳
 
 ## 免責事項
 
-**重要:** 本ツールはAISEG2デバイスのWebインターフェースに定期的にアクセスしてデータを取得します。これにより、AISEG2デバイスに負荷がかかる可能性があります。
+**重要:** 本ツールはAiSEG2デバイスのWebインターフェースに定期的にアクセスしてデータを取得します。これにより、AiSEG2デバイスに負荷がかかる可能性があります。
 
 - 本ツールの使用は自己責任でお願いします
-- AISEG2デバイスへの過度なアクセスは機器の動作に影響を与える可能性があります
+- AiSEG2デバイスへの過度なアクセスは機器の動作に影響を与える可能性があります
 - 適切な実行間隔を設定し、デバイスへの負荷を最小限に抑えてください
 - 本ツールの使用によって生じたいかなる損害についても、作者は責任を負いません
-- AISEG2は株式会社パナソニックの製品であり、本ツールは非公式のものです
+- AiSEG2は株式会社パナソニックの製品であり、本ツールは非公式のものです
 
 ## ライセンス
 

@@ -129,7 +129,7 @@ for file in $PYTHON_FILES; do
 done
 
 # Check manifest.json if it's been modified
-MANIFEST_FILE="custom_components/aiseg2mqtt/manifest.json"
+MANIFEST_FILE="custom_components/aiseg2_bridge/manifest.json"
 if git diff --cached --name-only | grep -q "$MANIFEST_FILE"; then
     echo -e "${BLUE}Validating manifest.json...${NC}"
     

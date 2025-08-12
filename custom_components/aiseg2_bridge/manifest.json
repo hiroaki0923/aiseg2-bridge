@@ -1,6 +1,6 @@
 {
-  "domain": "aiseg2mqtt",
-  "name": "AISEG2 (Native)",
+  "domain": "aiseg2_bridge",
+  "name": "AiSEG2 Bridge",
   "version": "0.2.0",
   "documentation": "https://github.com/hiroaki0923/aiseg2mqtt",
   "issue_tracker": "https://github.com/hiroaki0923/aiseg2mqtt/issues",
@@ -9,5 +9,5 @@
   "iot_class": "local_polling",
   "integration_type": "device",
   "config_flow": true,
-  "loggers": ["aiseg2mqtt", "httpx"]
+  "loggers": ["aiseg2_bridge", "httpx"]
 }
