@@ -75,12 +75,18 @@ class AiSeg2Client:
     async def _ensure_client(self):
         """Ensure the httpx client is initialized."""
         if self._client is None:
-            self._client = httpx.AsyncClient(
-                base_url=f"http://{self._cfg.host}",
-                timeout=self._cfg.timeout,
-                auth=httpx.DigestAuth(self._cfg.user, self._cfg.password),
-                headers={"User-Agent": "aiseg2/ha-integration"},
-            )
+            import asyncio
+
+            def create_client():
+                return httpx.AsyncClient(
+                    base_url=f"http://{self._cfg.host}",
+                    timeout=self._cfg.timeout,
+                    auth=httpx.DigestAuth(self._cfg.user, self._cfg.password),
+                    headers={"User-Agent": "aiseg2/ha-integration"},
+                )
+
+            # Run SSL initialization in a separate thread to avoid blocking the event loop
+            self._client = await asyncio.to_thread(create_client)
 
     async def close(self):
         """Close the HTTP client."""
