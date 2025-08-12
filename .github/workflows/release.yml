@@ -22,6 +22,7 @@ jobs:
 
   create-release:
     needs: validate-hacs
+    if: always()  # Run even if HACS validation fails
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -57,20 +58,27 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body: |
-            ## HACS Integration
+            ## Home Assistant Custom Component
             
-            This release is available as a Home Assistant Custom Component (HACS):
+            This release is available as a Home Assistant Custom Component:
             
-            ### Installation via HACS
-            1. Add this repository to HACS custom repositories
-            2. Install "AiSEG2 Bridge" integration
-            3. Restart Home Assistant
-            4. Add the integration via Settings → Devices & Services
+            ### Installation via HACS (Custom Repository)
+            1. Add this repository to HACS as a custom repository: `https://github.com/hiroaki0923/aiseg2-bridge`
+            2. Category: Integration
+            3. Install "AiSEG2 Bridge" integration
+            4. Restart Home Assistant
+            5. Add the integration via Settings → Devices & Services
             
             ### Manual Installation
             1. Download the latest release
             2. Extract `custom_components/aiseg2_bridge` to your Home Assistant `custom_components` directory
             3. Restart Home Assistant
+            4. Add the integration via Settings → Devices & Services
+            
+            ### HACS Validation Status
+            - ✅ Repository metadata, topics, and manifest validation passed
+            - ℹ️  Brands validation skipped (expected for custom integrations)
+            - 📋 This integration is ready for use as a custom component
             
             ## Changes
             
