@@ -5,7 +5,7 @@ AISEG2 → MQTT Discovery (per-circuit daily kWh)
 - スクレイプ: ブログ検証コードと同等（HTTPDigestAuth、/52111/53111/54111/51111、/584?data=base64({"circuitid":"NN"})）
 - MQTT:
   * Discovery/config: retain=True
-  * state: retain=True（HA再起動後も直ちに当日値を復元）
+  * state: retain=False（値は定期更新前提）
   * publishはACK待ち（wait_for_publish）、sleep不使用
 - エンティティID: object_id を "aiseg2mqtt_..." として固定（例: sensor.aiseg2mqtt_c12）
 - リセット表現: state_class=total + last_reset=当日0:00(JST)
@@ -124,7 +124,7 @@ def mqtt_client() -> mqtt.Client:
     mc.loop_start()  # ACK処理のため必須
     return mc
 
-def publish_and_wait(mc: mqtt.Client, topic: str, payload: str | None, qos: int = 1, retain: bool = True) -> None:
+def publish_and_wait(mc: mqtt.Client, topic: str, payload: str | None, qos: int = 1, retain: bool = False) -> None:
     """PublishしてACKを待つ（sleep不要）"""
     info = mc.publish(topic, payload, qos=qos, retain=retain)
     info.wait_for_publish()
@@ -167,7 +167,7 @@ def publish_discovery_energy(mc: mqtt.Client, uid: str, key: str, name: str,
         "val_tpl": "{{ value_json.kwh }}",
         "json_attr_t": attr_t,
     }
-    publish_and_wait(mc, cfg_t, json.dumps(payload, ensure_ascii=False))
+    publish_and_wait(mc, cfg_t, json.dumps(payload, ensure_ascii=False), retain=True)
     return st_t
 
 def publish_discovery_circuit(mc: mqtt.Client, uid: str, cid: str, cname: str,
@@ -192,7 +192,7 @@ def publish_discovery_circuit(mc: mqtt.Client, uid: str, cid: str, cname: str,
         "val_tpl": "{{ value_json.kwh }}",
         "json_attr_t": st_t,  # state payloadを属性にも流用
     }
-    publish_and_wait(mc, cfg_t, json.dumps(payload, ensure_ascii=False))
+    publish_and_wait(mc, cfg_t, json.dumps(payload, ensure_ascii=False), retain=True)
     return st_t
 
 # ----- Main -----
@@ -208,12 +208,12 @@ def main() -> None:
     # 2) MQTT接続
     mc = mqtt_client()
 
-    # 3) Availability / Meta（retain=True）
+    # 3) Availability / Meta
     avty_t = availability_topic(uid)
-    publish_and_wait(mc, avty_t, "online")
+    publish_and_wait(mc, avty_t, "online")  # availabilityはretain不要
     meta_t = meta_topic(uid)
     meta = {"term": SCAN_TERM, "circuit_count": len(per), "ts": datetime.now(JST).isoformat()}
-    publish_and_wait(mc, meta_t, json.dumps(meta, ensure_ascii=False))
+    publish_and_wait(mc, meta_t, json.dumps(meta, ensure_ascii=False))  # metaもretain不要
 
     # 4) Discovery（config 全件・retain=True）
     total_map = [
@@ -230,7 +230,7 @@ def main() -> None:
     for c in per:
         publish_discovery_circuit(mc, uid, c["id"], c["name"], avty_t, last_reset_iso)
 
-    # 5) state（全件・retain=True）
+    # 5) state（全件・retain=False）
     for key, st in total_state_topics.items():
         publish_and_wait(mc, st, json.dumps({"kwh": totals.get(key, 0.0)}))
 
@@ -246,10 +246,10 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        # 失敗時は availability=offline をretainで残す
+        # 失敗時は availability=offline を送信
         try:
             mc = mqtt_client()
-            publish_and_wait(mc, availability_topic(DEVICE_ID), "offline")
+            publish_and_wait(mc, availability_topic(DEVICE_ID), "offline")  # retain不要
             disconnect_gracefully(mc)
         except Exception:
             pass
