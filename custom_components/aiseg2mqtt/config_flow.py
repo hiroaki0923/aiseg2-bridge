@@ -6,13 +6,13 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import DOMAIN, CONF_HOST, CONF_USER, CONF_PASSWORD, CONF_SCAN_INTERVAL, DEFAULT_USER, DEFAULT_SCAN_INTERVAL
-from aiseg2mqtt_core import AiSeg2Client, AiSeg2Config
+from .const import DOMAIN, CONF_SCAN_INTERVAL, DEFAULT_USER, DEFAULT_SCAN_INTERVAL
+from . import AiSeg2Client, AiSeg2Config
 
 DATA_SCHEMA = vol.Schema({
-    vol.Required(CONF_HOST): str,
-    vol.Optional(CONF_USER, default=DEFAULT_USER): str,
-    vol.Optional(CONF_PASSWORD, default=""): str,
+    vol.Required("host"): str,
+    vol.Optional("username", default=DEFAULT_USER): str,
+    vol.Optional("password", default=""): str,
 })
 
 OPTIONS_SCHEMA = vol.Schema({
@@ -27,9 +27,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             # 接続テスト
             cfg = AiSeg2Config(
-                host=user_input[CONF_HOST],
-                user=user_input.get(CONF_USER, DEFAULT_USER),
-                password=user_input.get(CONF_PASSWORD, ""),
+                host=user_input["host"],
+                user=user_input.get("username", DEFAULT_USER),
+                password=user_input.get("password", ""),
                 timeout=10.0
             )
             client = AiSeg2Client(cfg)
@@ -38,9 +38,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await client.fetch_circuit_catalog()
                 await client.close()
                 return self.async_create_entry(title=f"AiSEG2 ({cfg.host})", data={
-                    CONF_HOST: cfg.host,
-                    CONF_USER: cfg.user,
-                    CONF_PASSWORD: cfg.password,
+                    "host": cfg.host,
+                    "username": cfg.user,
+                    "password": cfg.password,
                 })
             except Exception:
                 await client.close()
@@ -73,4 +73,4 @@ class OptionsFlow(config_entries.OptionsFlow):
     async def async_step_options(self, user_input=None):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
-        return self._entry.flow_handler.async_show_form(step_id="options", data_schema=OPTIONS_SCHEMA)
+        return self.async_show_form(step_id="options", data_schema=OPTIONS_SCHEMA)

@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.config_entries import ConfigEntry
 
-from .const import DOMAIN, CONF_HOST
+from .const import DOMAIN
 
 JST = timezone(timedelta(hours=9))
 
@@ -20,9 +20,8 @@ TOTAL_KEYS = [
 ]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
-    data = hass.data[DOMAIN][entry.entry_id]
-    coordinator = data["coordinator"]
-    host = entry.data[CONF_HOST]
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    host = entry.data["host"]
 
     ents = []
     # 合計系
@@ -30,8 +29,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         ents.append(TotalEnergySensor(coordinator, entry, host, key, name))
 
     # 回路系
-    for c in coordinator.data.get("circuits", []):
-        ents.append(CircuitEnergySensor(coordinator, entry, host, c["id"], c["name"]))
+    if coordinator.data:
+        circuits = coordinator.data.get("circuits", {})
+        for cid, cdata in circuits.items():
+            ents.append(CircuitEnergySensor(coordinator, entry, host, cid, cdata["name"]))
 
     async_add_entities(ents)
 
@@ -83,7 +84,10 @@ class CircuitEnergySensor(_Base):
 
     @property
     def native_value(self) -> Optional[float]:
-        for c in self.coordinator.data.get("circuits", []):
-            if str(c["id"]) == self._cid:
-                return float(c["kwh"])
+        if not self.coordinator.data:
+            return None
+        circuits = self.coordinator.data.get("circuits", {})
+        circuit_data = circuits.get(self._cid)
+        if circuit_data:
+            return float(circuit_data.get("kwh", 0))
         return None

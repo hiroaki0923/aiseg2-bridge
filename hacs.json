@@ -1,0 +1,9 @@
+{
+  "name": "AISEG2 to MQTT Bridge",
+  "content_in_root": false,
+  "render_readme": true,
+  "homeassistant": "2024.1.0",
+  "country": ["JP"],
+  "domains": ["sensor"],
+  "iot_class": "Local Polling"
+}
