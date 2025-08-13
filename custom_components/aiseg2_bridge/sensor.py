@@ -71,6 +71,8 @@ class TotalEnergySensor(_Base):
         self._key = key
         self._attr_name = disp_name
         self._attr_unique_id = f"{DOMAIN}-{host}-{key}"
+        # Set explicit entity_id (use underscore format of key)
+        self.entity_id = f"sensor.aiseg2_bridge_{key.replace('_kwh', '')}"
 
     @property
     def native_value(self) -> Optional[float]:
@@ -86,6 +88,8 @@ class CircuitEnergySensor(_Base):
         self._cname = cname
         self._attr_name = cname
         self._attr_unique_id = f"{DOMAIN}-{host}-c{self._cid}"
+        # Set explicit entity_id
+        self.entity_id = f"sensor.aiseg2_bridge_c{self._cid}"
 
     @property
     def native_value(self) -> Optional[float]:
