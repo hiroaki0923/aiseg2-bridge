@@ -10,5 +10,5 @@
   "integration_type": "device",
   "config_flow": true,
   "loggers": ["aiseg2_bridge", "httpx"],
-  "icon": "icon.png"
+  "integration_icon": "mdi:home-lightning-bolt"
 }

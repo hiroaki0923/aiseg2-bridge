@@ -53,7 +53,7 @@ class _Base(CoordinatorEntity, SensorEntity):
     @property
     def device_info(self):
         return {
-            "identifiers": {(DOMAIN, f"aiseg2-{self._host}")},
+            "identifiers": {(DOMAIN, f"{DOMAIN}-{self._host}")},
             "name": f"AiSEG2 ({self._host})",
             "manufacturer": "Panasonic",
             "model": "AiSEG2",
